@@ -34,6 +34,8 @@ const prepackagedIndex = process.argv.indexOf("--prepackaged");
 if (prepackagedIndex >= 0 && !process.argv[prepackagedIndex + 1])
   throw new Error("Provide the prepackaged app directory.");
 await build({
+  // Packaging must not implicitly publish when running on a CI runner.
+  publish: "never",
   targets: Platform.WINDOWS.createTarget(
     process.argv.includes("--installer-only") ? ["nsis"] : ["nsis", "portable"],
     Arch.x64,
