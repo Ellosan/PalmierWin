@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: palmier-media:; media-src 'self' blob: palmier-media:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-src 'none'"
+    />
+    <title>PalmierWin — Video editor</title>
+    <link rel="icon" href="../../assets/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="titlebar">
+        <div class="window-brand">
+          <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+            <path
+              d="M16 27V13M16 16C13 7 5 7 3 10c6-1 10 3 13 6Zm0 0C19 7 27 7 29 10c-6-1-10 3-13 6Zm0-3C12 5 14 2 16 2c2 0 4 3 0 11Z"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            /></svg
+          ><span>Palmier<span class="brand-win">Win</span></span>
+        </div>
+        <button id="chat-toggle" class="quiet-button" title="Toggle agent chat">
+          <span data-icon="sparkles"></span>Chat
+        </button>
+        <span class="titlebar-caption">Somewhere, slowly</span>
+        <div class="window-actions">
+          <button data-window="minimize" aria-label="Minimize window">
+            <span data-icon="minus"></span></button
+          ><button data-window="maximize" aria-label="Maximize window">
+            <span data-icon="square"></span></button
+          ><button data-window="close" aria-label="Close window">
+            <span data-icon="x"></span>
+          </button>
+        </div>
+      </header>
+      <header class="projectbar">
+        <div class="project-menu-wrap">
+          <button
+            id="project-menu-button"
+            class="project-menu-button"
+            aria-haspopup="menu"
+            aria-expanded="false"
+          >
+            <span class="project-avatar" data-icon="film"></span
+            ><span id="project-name">Somewhere, slowly</span
+            ><span data-icon="chevronDown"></span>
+          </button>
+          <div id="project-menu" class="popover hidden" role="menu">
+            <button data-command="new">
+              <span data-icon="plus"></span>New project <kbd>Ctrl N</kbd>
+            </button>
+            <button data-command="open">
+              <span data-icon="folderOpen"></span>Open project <kbd>Ctrl O</kbd>
+            </button>
+            <button data-command="import">
+              <span data-icon="import"></span>Import media <kbd>Ctrl I</kbd>
+            </button>
+            <button data-command="save">
+              <span data-icon="save"></span>Save project <kbd>Ctrl S</kbd>
+            </button>
+            <button data-command="save-as">
+              Save project as… <kbd>Ctrl ⇧ S</kbd>
+            </button>
+            <hr />
+            <button data-command="rename">
+              <span data-icon="pencil"></span>Rename project
+            </button>
+            <button data-command="settings">
+              <span data-icon="settings"></span>Project & agent settings
+            </button>
+            <button data-command="demo">
+              <span data-icon="sparkles"></span>Open sample project
+            </button>
+          </div>
+        </div>
+        <span class="save-status"
+          ><span></span><span id="save-status">Saved locally</span></span
+        >
+        <div class="projectbar-spacer"></div>
+        <div class="history-buttons">
+          <button
+            class="icon-button"
+            id="undo"
+            title="Undo (Ctrl Z)"
+            aria-label="Undo"
+          >
+            <span data-icon="undo"></span></button
+          ><button
+            class="icon-button"
+            id="redo"
+            title="Redo (Ctrl Shift Z)"
+            aria-label="Redo"
+          >
+            <span data-icon="redo"></span>
+          </button>
+        </div>
+        <span class="divider"></span>
+        <button class="quiet-button mcp-button" id="mcp-button">
+          <span class="status-dot"></span><span id="mcp-label">MCP</span
+          ><span data-icon="plug"></span>
+        </button>
+        <button
+          class="icon-button"
+          id="settings-button"
+          aria-label="Settings"
+          title="Settings"
+        >
+          <span data-icon="settings"></span>
+        </button>
+        <button class="primary-button export-button" id="export-button">
+          <span data-icon="upload"></span>Export<span
+            data-icon="chevronDown"
+          ></span>
+        </button>
+      </header>
+
+      <main class="workspace">
+        <aside class="library panel">
+          <div class="panel-tabs" role="tablist" aria-label="Library">
+            <button
+              class="active"
+              role="tab"
+              aria-selected="true"
+              data-library="media"
+            >
+              <span data-icon="folder"></span>Media</button
+            ><button role="tab" aria-selected="false" data-library="generate">
+              <span data-icon="sparkles"></span>Generate
+            </button>
+          </div>
+          <section id="media-panel" class="library-content">
+            <div class="library-heading">
+              <span
+                >Project media
+                <span id="media-count" class="count">4</span></span
+              ><button
+                class="icon-button small"
+                id="import-small"
+                aria-label="Import media"
+                title="Import media (Ctrl I)"
+              >
+                <span data-icon="plus"></span>
+              </button>
+            </div>
+            <label class="search"
+              ><span data-icon="search"></span
+              ><input
+                id="media-search"
+                placeholder="Search media…"
+                aria-label="Search media"
+              /><kbd>⌕</kbd></label
+            >
+            <div class="filter-row" aria-label="Filter media">
+              <button class="active" data-filter="all">All</button
+              ><button data-filter="video">Video</button
+              ><button data-filter="image">Images</button
+              ><button data-filter="audio">Audio</button>
+            </div>
+            <div id="media-grid" class="media-grid"></div>
+            <button class="import-zone" id="import-button">
+              <span data-icon="import"></span><strong>Import media</strong
+              ><span>Drop files here, or click to browse</span
+              ><small>VIDEO · AUDIO · IMAGES · SRT</small>
+            </button>
+          </section>
+          <section id="generate-panel" class="generate-content hidden">
+            <div class="feature-icon" data-icon="sparkles"></div>
+            <span class="eyebrow">YOUR TOOLS, ONE TIMELINE</span>
+            <h2>From an idea<br />to the edit.</h2>
+            <p>
+              Use your connected agent to bring generated images, video, and
+              audio into your project.
+            </p>
+            <button class="secondary-button" data-command="mcp">
+              <span data-icon="plug"></span>Connect an agent
+            </button>
+            <div class="honest-note">
+              PalmierWin does not include Palmier’s paid generation services.
+              Generate with your own tools, then import the result.
+            </div>
+            <button class="quiet-button" id="generate-import">
+              <span data-icon="import"></span>Import generated media
+            </button>
+          </section>
+          <footer class="library-footer">
+            <span data-icon="hardDrive"></span><span>Local workspace</span
+            ><span class="status-dot"></span>
+          </footer>
+        </aside>
+
+        <section class="viewer" aria-label="Video preview">
+          <div class="viewer-toolbar">
+            <button id="timeline-name" class="quiet-button">
+              <span data-icon="film"></span>Timeline 1</button
+            ><span id="format-badge">1920 × 1080 <span>30 fps</span></span
+            ><button
+              class="icon-button small"
+              id="viewer-fit"
+              title="Fit preview"
+              aria-label="Fit preview"
+            >
+              <span data-icon="maximize"></span>
+            </button>
+          </div>
+          <div class="canvas-area" id="canvas-area">
+            <canvas
+              id="preview"
+              width="1920"
+              height="1080"
+              aria-label="Composited timeline preview"
+            ></canvas>
+            <div id="empty-preview" class="empty-preview hidden">
+              <span data-icon="film"></span>
+              <h2>A blank canvas.<br />A new story.</h2>
+              <p>Import your media to get started.</p>
+              <button class="secondary-button" data-command="import">
+                Import media
+              </button>
+            </div>
+            <span class="preview-tag" id="preview-tag">PREVIEW</span>
+            <div id="guides-overlay" class="guides-overlay hidden"></div>
+          </div>
+          <div class="transport">
+            <div class="transport-left">
+              <button
+                class="icon-button small"
+                id="guides-button"
+                title="Toggle composition guides"
+                aria-label="Toggle composition guides"
+              >
+                <span data-icon="grid"></span></button
+              ><button
+                class="icon-button small"
+                id="capture-button"
+                title="Save current frame as PNG"
+                aria-label="Save current frame"
+              >
+                <span data-icon="camera"></span>
+              </button>
+            </div>
+            <div class="transport-center">
+              <button
+                class="icon-button"
+                id="skip-start"
+                title="Go to start (Home)"
+                aria-label="Go to start"
+              >
+                <span data-icon="skipBack"></span></button
+              ><button
+                class="icon-button small"
+                id="frame-back"
+                title="Previous frame (Left)"
+                aria-label="Previous frame"
+              >
+                <span data-icon="stepBack"></span></button
+              ><button
+                class="play-button"
+                id="play"
+                title="Play / pause (Space)"
+                aria-label="Play"
+              >
+                <span data-icon="play"></span></button
+              ><button
+                class="icon-button small"
+                id="frame-forward"
+                title="Next frame (Right)"
+                aria-label="Next frame"
+              >
+                <span data-icon="stepForward"></span></button
+              ><button
+                class="icon-button"
+                id="skip-end"
+                title="Go to end (End)"
+                aria-label="Go to end"
+              >
+                <span data-icon="skipForward"></span>
+              </button>
+            </div>
+            <div class="time-display">
+              <button id="current-time" title="Go to a timecode">
+                00:00:02:00</button
+              ><span>/</span><span id="total-time">00:00:20:00</span>
+            </div>
+          </div>
+        </section>
+
+        <aside class="right-panel panel">
+          <div class="panel-tabs" role="tablist" aria-label="Editing panels">
+            <button
+              class="active"
+              role="tab"
+              aria-selected="true"
+              data-right="agent"
+            >
+              <span data-icon="sparkles"></span>Agent</button
+            ><button role="tab" aria-selected="false" data-right="inspector">
+              <span data-icon="sliders"></span>Inspector
+            </button>
+          </div>
+          <section id="agent-panel" class="agent-content">
+            <div id="chat-messages" class="chat-messages">
+              <div class="agent-welcome">
+                <div class="agent-orbit">
+                  <span data-icon="sparkles"></span>
+                </div>
+                <span class="eyebrow">A LITTLE HELP WITH THE BIG PICTURE</span>
+                <h2>What are we<br />making today?</h2>
+                <p>
+                  Bring your idea. Shape the story.<br />Keep the creative part
+                  yours.
+                </p>
+                <div class="suggestions">
+                  <button data-quick="title">
+                    <span data-icon="type"></span>Add a title at the
+                    playhead<span data-icon="arrowUpRight"></span></button
+                  ><button data-quick="vertical">
+                    <span data-icon="smartphone"></span>Make a vertical
+                    version<span data-icon="arrowUpRight"></span></button
+                  ><button data-quick="assemble">
+                    <span data-icon="layers"></span>Build a cut from my
+                    media<span data-icon="arrowUpRight"></span>
+                  </button>
+                </div>
+                <div class="agent-connect-hint">
+                  <span class="status-dot"></span>Quick edits work locally.<br /><button
+                    data-command="settings"
+                  >
+                    Connect a provider
+                  </button>
+                  for AI chat.
+                </div>
+              </div>
+            </div>
+            <form id="chat-form" class="chat-composer">
+              <label class="sr-only" for="chat-input"
+                >Ask your editing agent</label
+              ><textarea
+                id="chat-input"
+                placeholder="Describe your next edit…"
+                rows="2"
+              ></textarea>
+              <div class="composer-footer">
+                <button type="button" id="agent-provider" class="quiet-button">
+                  <span data-icon="sparkles"></span><span>Connect agent</span
+                  ><span data-icon="chevronDown"></span></button
+                ><button
+                  type="submit"
+                  class="send-button"
+                  id="chat-send"
+                  title="Send message"
+                  aria-label="Send message"
+                >
+                  <span data-icon="arrowUp"></span>
+                </button>
+              </div>
+            </form>
+            <span class="composer-note"
+              >Your project stays on your computer.</span
+            >
+          </section>
+          <section
+            id="inspector-panel"
+            class="inspector-content hidden"
+          ></section>
+        </aside>
+      </main>
+
+      <div
+        class="resize-handle"
+        id="timeline-resize"
+        role="separator"
+        aria-label="Resize timeline"
+        aria-orientation="horizontal"
+        tabindex="0"
+      ></div>
+      <section class="timeline" aria-label="Timeline editor">
+        <div class="timeline-tabstrip" id="timeline-tabs"></div>
+        <div class="timeline-toolbar">
+          <div class="tool-group">
+            <button
+              class="tool active"
+              data-tool="select"
+              title="Selection tool (V)"
+              aria-label="Selection tool"
+            >
+              <span data-icon="cursor"></span></button
+            ><button
+              class="tool"
+              data-tool="razor"
+              title="Razor tool (C)"
+              aria-label="Razor tool"
+            >
+              <span data-icon="scissors"></span></button
+            ><button
+              class="tool"
+              id="add-text"
+              title="Add text (T)"
+              aria-label="Add text"
+            >
+              <span data-icon="type"></span></button
+            ><span class="divider"></span
+            ><button
+              class="tool"
+              id="add-marker"
+              title="Add marker (M)"
+              aria-label="Add marker"
+            >
+              <span data-icon="bookmark"></span></button
+            ><button
+              class="tool active"
+              id="snapping"
+              title="Snapping (S)"
+              aria-label="Toggle snapping"
+              aria-pressed="true"
+            >
+              <span data-icon="magnet"></span>
+            </button>
+          </div>
+          <div class="timeline-title">
+            <span class="timeline-active-dot"></span
+            ><span id="active-timeline-label">Timeline 1</span
+            ><span id="timeline-clip-count">6 clips</span>
+          </div>
+          <div class="timeline-actions">
+            <button
+              class="icon-button small"
+              id="add-track"
+              title="Add track"
+              aria-label="Add track"
+            >
+              <span data-icon="layers"></span
+              ><span data-icon="plus"></span></button
+            ><span class="divider"></span
+            ><button
+              class="icon-button small"
+              id="zoom-out"
+              title="Zoom out"
+              aria-label="Zoom out"
+            >
+              <span data-icon="minus"></span></button
+            ><input
+              id="timeline-zoom"
+              type="range"
+              min="0.25"
+              max="6"
+              step="0.05"
+              value="1.5"
+              aria-label="Timeline zoom"
+            /><button
+              class="icon-button small"
+              id="zoom-in"
+              title="Zoom in"
+              aria-label="Zoom in"
+            >
+              <span data-icon="plus"></span></button
+            ><button
+              class="quiet-button fit-button"
+              id="zoom-fit"
+              title="Fit timeline (Shift Z)"
+            >
+              Fit
+            </button>
+          </div>
+        </div>
+        <div class="timeline-scroll" id="timeline-scroll">
+          <div class="timeline-content" id="timeline-content">
+            <div class="ruler" id="ruler">
+              <div class="ruler-label" id="ruler-label">00:00:02:00</div>
+              <div id="ruler-ticks"></div>
+              <div id="ruler-markers"></div>
+            </div>
+            <div id="tracks"></div>
+            <div class="playhead" id="playhead">
+              <span></span>
+              <div></div>
+            </div>
+            <div class="timeline-drop-hint" id="timeline-drop-hint">
+              Drop media onto a track to start your story
+            </div>
+          </div>
+        </div>
+        <footer class="statusbar">
+          <div>
+            <span class="status-dot"></span
+            ><span id="status-text">Ready when you are</span>
+          </div>
+          <div>
+            <span id="selected-status">No clip selected</span
+            ><span class="status-divider">·</span
+            ><span id="project-format">1080p / 30 fps</span
+            ><button
+              id="shortcuts-button"
+              title="Keyboard shortcuts"
+              aria-label="Keyboard shortcuts"
+            >
+              <span data-icon="keyboard"></span>
+            </button>
+          </div>
+        </footer>
+      </section>
+    </div>
+    <dialog id="modal"><div id="modal-content"></div></dialog>
+    <div id="context-menu" class="context-menu hidden" role="menu"></div>
+    <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
+    <script type="module" src="./app.mjs"></script>
+  </body>
+</html>
