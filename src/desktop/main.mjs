@@ -22,6 +22,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { loadEnvFile } from "node:process";
 import {
   ProjectStore,
   newProject,
@@ -32,6 +33,12 @@ import {
 import { demoProject } from "../core/demo.mjs";
 import { startMcp, createToolRunner, toolDefinitions } from "./mcp.mjs";
 import { renderProject } from "./export.mjs";
+import {
+  NVIDIA_ENDPOINT,
+  NVIDIA_MODEL,
+  environmentKey,
+  requestCompletion,
+} from "./provider.mjs";
 
 const require = createRequire(import.meta.url),
   execFileAsync = promisify(execFile);
@@ -39,6 +46,15 @@ const root = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../..",
 );
+// Development credentials stay outside the source and packaged application.
+if (!app.isPackaged) {
+  try {
+    loadEnvFile(path.join(root, ".env.local"));
+  } catch (error) {
+    if (error.code !== "ENOENT")
+      throw new Error("Could not load local provider settings.");
+  }
+}
 app.setName("PalmierWin");
 if (
   process.env.PALMIERWIN_USER_DATA &&
@@ -71,7 +87,7 @@ let window,
   exportController;
 let exportJob = { status: "idle", progress: 0 },
   mcpStatus = "starting",
-  settings = { endpoint: "https://api.openai.com/v1", model: "", key: null },
+  settings = { endpoint: NVIDIA_ENDPOINT, model: NVIDIA_MODEL, key: null },
   conversation = [];
 const mediaPaths = new Map();
 const extensions = {
@@ -284,7 +300,7 @@ async function startExport({
 const publicSettings = () => ({
   endpoint: settings.endpoint,
   model: settings.model,
-  hasKey: !!settings.key,
+  hasKey: !!(settings.key || environmentKey(settings)),
 });
 async function persistSettings(value) {
   const url = new URL(value.endpoint);
@@ -302,7 +318,10 @@ async function persistSettings(value) {
     );
   settings.endpoint = value.endpoint.replace(/\/$/, "");
   settings.model = String(value.model ?? "").slice(0, 200);
-  if (value.clearKey) settings.key = null;
+  if (value.clearKey) {
+    settings.key = null;
+    delete process.env.NVIDIA_API_KEY;
+  }
   if (value.apiKey) {
     if (!safeStorage.isEncryptionAvailable())
       throw new Error(
@@ -317,14 +336,16 @@ async function persistSettings(value) {
 let agentBusy = false;
 async function agentChat(message) {
   if (agentBusy) throw new Error("Wait for the current agent request.");
-  if (!settings.model || !settings.key)
+  if (!settings.model || !(settings.key || environmentKey(settings)))
     throw new Error(
       "Connect an OpenAI-compatible provider in Settings, or connect Claude/Codex through MCP.",
     );
   if (typeof message !== "string" || !message.trim() || message.length > 20000)
     throw new Error("Enter a message under 20,000 characters.");
+  const apiKey = settings.key
+    ? safeStorage.decryptString(Buffer.from(settings.key, "base64"))
+    : environmentKey(settings);
   agentBusy = true;
-  const apiKey = safeStorage.decryptString(Buffer.from(settings.key, "base64"));
   const system = {
     role: "system",
     content:
@@ -333,33 +354,20 @@ async function agentChat(message) {
   const pending = [...conversation, { role: "user", content: message }];
   try {
     for (let step = 0; step < 8; step++) {
-      const response = await fetch(`${settings.endpoint}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: settings.model,
-          messages: [system, ...pending],
-          tools: toolDefinitions.map((t) => ({
-            type: "function",
-            function: {
-              name: t.name,
-              description: t.description,
-              parameters: t.inputSchema,
-            },
-          })),
-        }),
-        signal: AbortSignal.timeout(120000),
+      const reply = await requestCompletion({
+        endpoint: settings.endpoint,
+        apiKey,
+        model: settings.model,
+        messages: [system, ...pending],
+        tools: toolDefinitions.map((t) => ({
+          type: "function",
+          function: {
+            name: t.name,
+            description: t.description,
+            parameters: t.inputSchema,
+          },
+        })),
       });
-      if (!response.ok)
-        throw new Error(
-          `The provider returned HTTP ${response.status}. Check your endpoint, model and key.`,
-        );
-      const body = await response.json(),
-        reply = body.choices?.[0]?.message;
-      if (!reply) throw new Error("The provider returned no message.");
       pending.push(reply);
       if (!reply.tool_calls?.length) {
         conversation = pending.slice(-60);

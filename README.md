@@ -36,7 +36,26 @@ The [Windows build workflow](.github/workflows/windows.yml) also produces downlo
 - **Chat** opens the left agent dock. Local quick edits work immediately. For AI chat, configure a tool-capable OpenAI-compatible provider in Settings. Keys are stored with Windows encryption. Requests use your provider account.
 - **Export** renders a video through FFmpeg. Choose H.264, H.265, or ProRes. **Ctrl S** saves a `.palmierwin` project; keep its media files in place. Every change also updates local recovery autosave.
 
-## Connect an external agent
+## AI providers and external agents
+
+### NVIDIA Nemotron
+
+New desktop installations default to `https://integrate.api.nvidia.com/v1` and
+`nvidia/nemotron-3-ultra-550b-a55b`. Enter your NVIDIA API key in Settings; Windows
+encrypts the saved key. Existing saved provider settings are preserved.
+
+For development, copy `.env.example` to `.env.local` and set `NVIDIA_API_KEY`.
+`npm start` loads that file only in development. It is ignored by Git and excluded
+from packaged applications. An environment key is used only with NVIDIA's exact
+API endpoint, never with another provider. Removing an environment key in Settings
+disables it for the current session; delete it from `.env.local` to remove it permanently.
+
+NVIDIA requests use streaming, thinking enabled, temperature 1, top-p 0.95, and a
+16,384-token output limit. The editor assembles the response before displaying the
+answer or executing complete tool calls. Requests have a ten-minute timeout;
+NVIDIA can still reject or time out requests during high traffic.
+
+### MCP clients
 
 Keep PalmierWin open, then configure a Streamable HTTP MCP client:
 
