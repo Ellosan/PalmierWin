@@ -25,7 +25,7 @@ The executables appear in `release/`. FFmpeg and ffprobe are bundled. You do not
 
 For Linux cross-builds, first install the Windows FFmpeg binary with `npm_config_platform=win32 npm_config_arch=x64 node node_modules/ffmpeg-static/install.js`. The pinned build helper uses Electron Builder's NSIS uninstaller extractor to build unsigned installers without Wine.
 
-The [Windows build workflow](.github/workflows/windows.yml) also produces downloadable NSIS and portable artifacts on pushes, pull requests, and manual runs. Builds are unsigned.
+The [Windows build workflow](.github/workflows/windows.yml) also produces downloadable NSIS and portable artifacts on pushes, pull requests, and manual runs. Pushing a version tag such as `v0.1.1` publishes a preview release with those files after a successful Windows build. The tag must match `package.json`, and release notes must exist at `docs/releases/<tag>.md`. A manual run can also publish a matching tag using the `release_tag` input. Builds are unsigned.
 
 ## Editing
 

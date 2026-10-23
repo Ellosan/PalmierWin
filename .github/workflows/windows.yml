@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Existing draft release to attach the Windows files to (optional)"
+        description: "Version tag to publish after the Windows build (optional)"
         required: false
         type: string
 permissions:
@@ -41,21 +41,39 @@ jobs:
             release/README.txt
             release/PalmierWin-preview.png
           if-no-files-found: error
-  attach-release-files:
-    if: github.event_name == 'workflow_dispatch' && inputs.release_tag != ''
+  release:
+    name: Publish Windows release
+    if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
     needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/download-artifact@v4
         with:
           name: PalmierWin-Windows-x64
           path: release
-      - name: Attach files to the draft release
+      - name: Publish preview with Windows files
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
         run: |
-          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY"
-          gh release upload "$RELEASE_TAG" release/* --repo "$GITHUB_REPOSITORY"
+          set -euo pipefail
+          EXPECTED_TAG="v$(node -p "require('./package.json').version")"
+          if [ "$RELEASE_TAG" != "$EXPECTED_TAG" ]; then
+            echo "Release tag must match package version: $EXPECTED_TAG"
+            exit 1
+          fi
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft' > release-state.txt; then
+            if [ "$(cat release-state.txt)" != "true" ]; then
+              echo "Release $RELEASE_TAG is already published. Leaving its files intact."
+              exit 0
+            fi
+          else
+            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --draft --prerelease --title "PalmierWin $RELEASE_TAG — Windows preview" --notes-file "docs/releases/$RELEASE_TAG.md"
+          fi
+          gh release upload "$RELEASE_TAG" release/* --repo "$GITHUB_REPOSITORY" --clobber
+          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease --latest=false
