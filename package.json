@@ -1,6 +1,6 @@
 {
   "name": "palmierwin",
-  "version": "0.1.1",
+  "version": "0.1.2-beta.1",
   "description": "An independent Windows video editor inspired by Palmier's public workflow.",
   "private": true,
   "author": "PalmierWin contributors",
@@ -16,8 +16,10 @@
     "dist:dir": "electron-builder --dir"
   },
   "dependencies": {
+    "electron-updater": "6.8.11",
     "ffmpeg-static": "5.2.0",
-    "ffprobe-static": "3.1.0"
+    "ffprobe-static": "3.1.0",
+    "semver": "7.7.3"
   },
   "devDependencies": {
     "electron": "39.8.10",
@@ -26,6 +28,11 @@
   "build": {
     "appId": "io.palmierwin.editor",
     "productName": "PalmierWin",
+    "publish": {
+      "provider": "github",
+      "owner": "Ellosan",
+      "repo": "PalmierWin"
+    },
     "directories": {
       "output": "release"
     },

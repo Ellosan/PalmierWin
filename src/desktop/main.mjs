@@ -33,6 +33,7 @@ import {
 import { demoProject } from "../core/demo.mjs";
 import { startMcp, createToolRunner, toolDefinitions } from "./mcp.mjs";
 import { renderProject } from "./export.mjs";
+import { UpdateManager, RELEASES_PAGE } from "./updates.mjs";
 import {
   NVIDIA_ENDPOINT,
   NVIDIA_MODEL,
@@ -84,6 +85,7 @@ let window,
   filePath = null,
   saveTimer,
   mcpServer,
+  updates,
   exportController;
 let exportJob = { status: "idle", progress: 0 },
   mcpStatus = "starting",
@@ -130,10 +132,12 @@ function resolveMedia(m) {
     if (!["coast.mp4", "headland.png", "water.png", "tide.wav"].includes(name))
       throw new Error("Unknown demo asset.");
     // FFmpeg is a separate process and cannot read Electron's virtual ASAR paths.
-    return path.join(root, "assets", "demo", name).replace(
-      `${path.sep}app.asar${path.sep}`,
-      `${path.sep}app.asar.unpacked${path.sep}`,
-    );
+    return path
+      .join(root, "assets", "demo", name)
+      .replace(
+        `${path.sep}app.asar${path.sep}`,
+        `${path.sep}app.asar.unpacked${path.sep}`,
+      );
   }
   if (!path.isAbsolute(m.path))
     throw new Error("Media must have an absolute local path.");
@@ -486,6 +490,18 @@ function registerIpc() {
   });
   handle("get-settings", publicSettings);
   handle("save-settings", persistSettings);
+  handle("get-updates", () => updates.snapshot());
+  handle("configure-updates", (value) => updates.configure(value));
+  handle("check-updates", () => updates.check());
+  handle("download-update", async () => {
+    if (updates.state.portable) {
+      await shell.openExternal(updates.portableDownload());
+      return updates.snapshot();
+    }
+    return updates.download();
+  });
+  handle("install-update", () => updates.install());
+  handle("open-releases", () => shell.openExternal(RELEASES_PAGE));
   handle("agent-chat", agentChat);
   handle("window", (action) => {
     if (action === "minimize") window.minimize();
@@ -514,6 +530,42 @@ app
       };
     } catch {}
     store = new ProjectStore(initial);
+    let updateConfig = {};
+    try {
+      updateConfig = JSON.parse(
+        await readFile(userFile("updates.json"), "utf8"),
+      );
+    } catch {}
+    const supported = app.isPackaged && process.platform === "win32";
+    const portable = !!process.env.PORTABLE_EXECUTABLE_FILE;
+    const updater =
+      supported && !portable
+        ? new (require("electron-updater").NsisUpdater)()
+        : null;
+    updates = new UpdateManager({
+      version: app.getVersion(),
+      supported,
+      portable,
+      updater,
+      config: updateConfig,
+      fetchImpl: (url, options) => net.fetch(url, options),
+      persist: (value) =>
+        atomicWrite(userFile("updates.json"), JSON.stringify(value)),
+      beforeInstall: async () => {
+        if (exportJob.status === "rendering")
+          throw new Error(
+            "Finish or cancel the video export before restarting to update.",
+          );
+        await atomicWrite(
+          userFile("autosave.palmierwin"),
+          JSON.stringify(store.snapshot),
+        );
+      },
+      onChange: (value) => {
+        if (window && !window.isDestroyed())
+          window.webContents.send("update-status", value);
+      },
+    });
     registerMedia();
     store.subscribe(() => {
       registerMedia();
@@ -585,7 +637,10 @@ app
       publish();
     });
     window.loadFile(path.join(root, "src", "renderer", "index.html"));
-    window.once("ready-to-show", () => window.show());
+    window.once("ready-to-show", () => {
+      window.show();
+      updates.start();
+    });
     window.on("close", (event) => {
       if (exportJob.status === "rendering") {
         const response = dialog.showMessageBoxSync(window, {
@@ -604,6 +659,7 @@ app
     });
     app.on("window-all-closed", () => app.quit());
     app.on("before-quit", () => {
+      updates?.stop();
       mcpServer?.close();
       clearTimeout(saveTimer);
       if (store) {

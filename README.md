@@ -25,7 +25,15 @@ The executables appear in `release/`. FFmpeg and ffprobe are bundled. You do not
 
 For Linux cross-builds, first install the Windows FFmpeg binary with `npm_config_platform=win32 npm_config_arch=x64 node node_modules/ffmpeg-static/install.js`. The pinned build helper uses Electron Builder's NSIS uninstaller extractor to build unsigned installers without Wine.
 
-The [Windows build workflow](.github/workflows/windows.yml) also produces downloadable NSIS and portable artifacts on pushes, pull requests, and manual runs. Pushing a version tag such as `v0.1.1` publishes a preview release with those files after a successful Windows build. The tag must match `package.json`, and release notes must exist at `docs/releases/<tag>.md`. A manual run can also publish a matching tag using the `release_tag` input. Builds are unsigned.
+The [Windows build workflow](.github/workflows/windows.yml) also produces downloadable NSIS and portable artifacts on pushes, pull requests, and manual runs. A version tag publishes its files after a successful Windows build: `v0.1.2-beta.1` becomes a Beta pre-release; a plain tag such as `v0.1.2` becomes a Stable release and GitHub's Latest release. The tag must match `package.json`, and release notes must exist at `docs/releases/<tag>.md`. A manual run can also publish a matching tag using the `release_tag` input. Builds are unsigned.
+
+## App updates
+
+Open **Settings → Updates** or **Project menu → App updates**. Choose **Release — Latest · Stable** to receive stable releases only, or **Pre-Release — Beta** to also receive preview releases. A fresh Beta installation defaults to Beta; the selected channel is saved between launches. Switching channels never installs an older version.
+
+The installed Windows edition checks GitHub shortly after launch and every six hours when automatic checks are enabled. It downloads eligible updates in the background, verifies their checksums through Electron Updater, and shows a dot on Settings when an update is ready. **Restart and install** saves project recovery before restarting. Finish or cancel an active export first. Turning off automatic checks leaves **Check now** and **Download update** available.
+
+Portable editions can check the selected channel and open the corresponding portable download, but replacement is manual. Install the Setup edition for automatic installation. Versions before `0.1.2-beta.1` need one manual upgrade to gain the updater. No API key is needed for public GitHub update checks.
 
 ## Editing
 

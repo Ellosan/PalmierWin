@@ -243,6 +243,16 @@ async function browserBridge() {
         "Provider credentials are stored with Windows encryption in the desktop app. Open PalmierWin to connect a provider.",
       );
     },
+    updates: async () => ({
+      currentVersion: "Browser preview",
+      channel: "stable",
+      automatic: true,
+      supported: false,
+      canInstall: false,
+      phase: "unsupported",
+      message: "Updates are available in the Windows desktop app.",
+      progress: 0,
+    }),
     chat: async () => {
       throw new Error(
         "AI chat and the local MCP server run in the Windows desktop app. The quick-edit buttons work in this preview.",

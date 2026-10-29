@@ -3,6 +3,7 @@ import { getBridge, download } from "./bridge.mjs";
 import { Preview } from "./preview.mjs";
 import { Timeline } from "./timeline.mjs";
 import { Inspector } from "./inspector.mjs";
+import { mountUpdates } from "./updates.mjs";
 import { icon, hydrateIcons } from "./icons.mjs";
 import {
   $,
@@ -15,6 +16,8 @@ import {
   ask,
   confirmAction,
   showContext,
+  openMenu,
+  closeMenu,
 } from "./ui.mjs";
 
 hydrateIcons();
@@ -147,11 +150,15 @@ function tick(now) {
 function showRight(tab) {
   $(".app-shell").classList.toggle("agent-mode", tab === "agent");
   $("#chat-toggle").classList.toggle("active", tab === "agent");
+  $("#chat-toggle").setAttribute("aria-expanded", String(tab === "agent"));
   rightTab = tab;
   for (const button of $$("[data-right]")) {
     const active = button.dataset.right === tab;
     button.classList.toggle("active", active);
     button.setAttribute("aria-selected", active);
+    button.tabIndex = active ? 0 : -1;
+    button.id = `${button.dataset.right}-tab`;
+    button.setAttribute("aria-controls", `${button.dataset.right}-panel`);
   }
   $("#agent-panel").classList.toggle("hidden", tab !== "agent");
   $("#inspector-panel").classList.toggle("hidden", tab !== "inspector");
@@ -162,6 +169,9 @@ function setLibrary(tab) {
     const active = b.dataset.library === tab;
     b.classList.toggle("active", active);
     b.setAttribute("aria-selected", active);
+    b.tabIndex = active ? 0 : -1;
+    b.id = `${b.dataset.library}-tab`;
+    b.setAttribute("aria-controls", `${b.dataset.library}-panel`);
   }
   $("#media-panel").classList.toggle("hidden", tab !== "media");
   $("#generate-panel").classList.toggle("hidden", tab !== "generate");
@@ -202,7 +212,7 @@ function renderState(next) {
   $("#preview-tag").textContent =
     project.media.every((m) => m.path.startsWith("demo:")) &&
     project.media.length
-      ? "SAMPLE PROJECT · ORIGINAL PROCEDURAL MEDIA"
+      ? "SAMPLE PROJECT"
       : "PREVIEW";
   $("#selected-status").textContent =
     project.clips.find((c) => c.id === selected)?.name ?? "No clip selected";
@@ -431,6 +441,7 @@ const commands = {
   },
   import: () => importMedia(),
   settings: showSettings,
+  updates: () => showSettings("updates"),
   mcp: showMcp,
 };
 async function command(name) {
@@ -443,7 +454,7 @@ async function command(name) {
 document.addEventListener("click", (e) => {
   const button = e.target.closest("[data-command]");
   if (button) {
-    $("#project-menu").classList.add("hidden");
+    closeMenu($("#project-menu"), true);
     command(button.dataset.command);
   }
   const win = e.target.closest("[data-window]");
@@ -455,16 +466,40 @@ for (const button of $$("[data-library]"))
   button.onclick = () => setLibrary(button.dataset.library);
 $("#project-menu-button").onclick = () => {
   const el = $("#project-menu");
-  el.classList.toggle("hidden");
-  $("#project-menu-button").setAttribute(
-    "aria-expanded",
-    !el.classList.contains("hidden"),
-  );
+  if (el.classList.contains("hidden")) openMenu(el, $("#project-menu-button"));
+  else closeMenu(el, true);
 };
+$("#project-menu-button").addEventListener("keydown", (event) => {
+  if (["ArrowDown", "ArrowUp"].includes(event.key)) {
+    event.preventDefault();
+    openMenu($("#project-menu"), event.currentTarget);
+    if (event.key === "ArrowUp")
+      $("#project-menu").querySelector("button:last-child")?.focus();
+  }
+});
+for (const tablist of $$('[role="tablist"]')) {
+  tablist.addEventListener("keydown", (event) => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    const tabs = [...tablist.querySelectorAll('[role="tab"]')].filter(
+      (tab) => tab.getClientRects().length,
+    );
+    const index = tabs.indexOf(document.activeElement);
+    if (index < 0) return;
+    event.preventDefault();
+    const next =
+      event.key === "Home"
+        ? 0
+        : event.key === "End"
+          ? tabs.length - 1
+          : (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) %
+            tabs.length;
+    tabs[next].click();
+    tabs[next].focus({ preventScroll: true });
+  });
+}
 document.addEventListener("pointerdown", (e) => {
   if (!e.target.closest(".project-menu-wrap")) {
-    $("#project-menu").classList.add("hidden");
-    $("#project-menu-button").setAttribute("aria-expanded", "false");
+    closeMenu($("#project-menu"));
   }
 });
 $("#undo").onclick = async () => {
@@ -481,9 +516,10 @@ $("#media-search").oninput = () => renderMedia();
 for (const button of $$("[data-filter]"))
   button.onclick = () => {
     filter = button.dataset.filter;
-    $$("[data-filter]").forEach((b) =>
-      b.classList.toggle("active", b === button),
-    );
+    $$("[data-filter]").forEach((b) => {
+      b.classList.toggle("active", b === button);
+      b.setAttribute("aria-pressed", String(b === button));
+    });
     renderMedia();
   };
 $("#media-grid").addEventListener("dragstart", (e) => {
@@ -505,9 +541,12 @@ $("#media-grid").addEventListener("click", (e) => {
       "Double-click or drag this media onto the timeline";
 });
 $("#media-grid").addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
+  if (["Enter", " "].includes(e.key)) {
     const el = e.target.closest("[data-media]");
-    if (el) addMedia(el.dataset.media);
+    if (el) {
+      e.preventDefault();
+      addMedia(el.dataset.media);
+    }
   }
 });
 $("#media-grid").addEventListener("contextmenu", (e) => {
@@ -584,8 +623,9 @@ $("#add-track").onclick = (e) =>
     },
   ]);
 $("#mcp-button").onclick = showMcp;
-$("#settings-button").onclick = showSettings;
-$("#agent-provider").onclick = showSettings;
+$("#settings-button").onclick = () =>
+  showSettings(updatePhase === "ready" ? "updates" : "project");
+$("#agent-provider").onclick = () => showSettings("ai");
 $("#export-button").onclick = showExport;
 $("#shortcuts-button").onclick = showShortcuts;
 $("#chat-toggle").onclick = () =>
@@ -802,14 +842,86 @@ $("#chat-input").onkeydown = (e) => {
   }
 };
 
-async function showSettings() {
+async function showSettings(section = "project") {
   pause();
   settings = await bridge.settings();
-  modal(
+  const disabled = !bridge.desktop ? "disabled" : "";
+  const dialog = modal(
     `${icon("settings")}Settings`,
-    `<form id="settings-form"><h3 style="margin-top:0">Project format</h3><div class="form-row"><div class="form-field"><label for="setting-width">Width</label><input id="setting-width" type="number" min="16" max="7680" step="2" value="${project.width}" required></div><div class="form-field"><label for="setting-height">Height</label><input id="setting-height" type="number" min="16" max="7680" step="2" value="${project.height}" required></div></div><div class="form-row"><div class="form-field"><label for="setting-fps">Frame rate</label><select id="setting-fps">${[24, 25, 30, 50, 60, 120].map((v) => `<option value="${v}" ${project.fps === v ? "selected" : ""}>${v} fps</option>`).join("")}</select></div><div class="form-field"><label for="setting-preset">Aspect ratio</label><select id="setting-preset"><option value="custom">Current / custom</option value="1920,1080">16:9 · Landscape</option><option value="1080,1920">9:16 · Vertical</option><option value="1080,1080">1:1 · Square</option><option value="3840,2160">16:9 · 4K</option></select></div></div><h3>AI agent · your provider</h3><p class="browser-note">Connect an OpenAI-compatible Chat Completions provider with tool calling. Provider usage is billed to your account. Only your chat and tool context are sent when you send a message.</p><div class="form-field"><label for="setting-endpoint">API base URL</label><input id="setting-endpoint" type="url" value="${esc(settings.endpoint)}" ${!bridge.desktop ? "disabled" : ""}></div><div class="form-field"><label for="setting-model">Model ID</label><input id="setting-model" value="${esc(settings.model)}" placeholder="Enter a model ID from your provider" ${!bridge.desktop ? "disabled" : ""}></div><div class="form-field"><label for="setting-key">API key</label><input id="setting-key" type="password" autocomplete="off" placeholder="${settings.hasKey ? "A key is saved. Leave blank to keep it." : "Enter your provider API key"}" ${!bridge.desktop ? "disabled" : ""}><small>${bridge.desktop ? "Encrypted locally with Windows credential protection. Keys are never returned to the editor UI." : "Provider connections are available in the Windows desktop app."}</small></div>${settings.hasKey ? '<label class="browser-note"><input id="setting-clear-key" type="checkbox"> Remove saved API key</label>' : ""}<div class="info-box">Already use Claude, Codex, or Cursor? Connect them through the <button type="button" class="quiet-button" id="settings-mcp">local MCP server ${icon("arrowUpRight")}</button></div><div id="settings-error" class="inline-error" role="alert"></div></form>`,
-    `<button class="quiet-button" data-close>Cancel</button><button class="primary-button" type="submit" form="settings-form">Save settings</button>`,
+    `<form id="settings-form" class="settings-layout">
+      <nav class="settings-nav" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
+        <button type="button" role="tab" id="settings-project-tab" data-settings-panel="project" aria-controls="settings-project">${icon("sliders")}<span>Project<small>Format & canvas</small></span></button>
+        <button type="button" role="tab" id="settings-ai-tab" data-settings-panel="ai" aria-controls="settings-ai">${icon("sparkles")}<span>AI Assistant<small>Provider & privacy</small></span></button>
+        <button type="button" role="tab" id="settings-updates-tab" data-settings-panel="updates" aria-controls="settings-updates">${icon("download")}<span>Updates<small>Stable & Beta</small></span></button>
+      </nav>
+      <div class="settings-pages">
+        <section id="settings-project" role="tabpanel" aria-labelledby="settings-project-tab">
+          <span class="settings-eyebrow">PROJECT SETTINGS</span><h3>Project format</h3><p class="browser-note">Set the canvas size and frame rate for this project.</p>
+          <div class="form-field"><label for="setting-preset">Canvas preset</label><select id="setting-preset"><option value="custom">Current / custom</option><option value="1920,1080">16:9 · Landscape</option><option value="1080,1920">9:16 · Vertical</option><option value="1080,1080">1:1 · Square</option><option value="3840,2160">16:9 · 4K</option></select></div>
+          <div class="form-row"><div class="form-field"><label for="setting-width">Width · px</label><input id="setting-width" type="number" min="16" max="7680" step="2" value="${project.width}" required></div><div class="form-field"><label for="setting-height">Height · px</label><input id="setting-height" type="number" min="16" max="7680" step="2" value="${project.height}" required></div></div>
+          <div class="form-field"><label for="setting-fps">Frame rate</label><select id="setting-fps">${[24, 25, 30, 50, 60, 120].map((v) => `<option value="${v}" ${project.fps === v ? "selected" : ""}>${v} fps</option>`).join("")}</select></div>
+          <div class="settings-note">${icon("film")}<span>Changing the frame rate keeps clip timing in seconds. You can undo format changes.</span></div>
+        </section>
+        <section id="settings-ai" class="hidden" role="tabpanel" aria-labelledby="settings-ai-tab">
+          <span class="settings-eyebrow">AI ASSISTANT</span><h3>Connect your assistant</h3><p class="browser-note">Use a provider that supports tool calling. Chat and editing context are shared when you send a message; provider usage is billed to your account.</p>
+          <div class="form-field"><label for="setting-endpoint">API base URL</label><input id="setting-endpoint" type="url" value="${esc(settings.endpoint)}" ${disabled}></div>
+          <div class="form-field"><label for="setting-model">Model ID</label><input id="setting-model" value="${esc(settings.model)}" placeholder="Enter your provider’s model ID" ${disabled}></div>
+          <div class="form-field"><label for="setting-key">API key</label><input id="setting-key" type="password" autocomplete="off" placeholder="${settings.hasKey ? "A key is saved. Leave blank to keep it." : "Enter your provider API key"}" ${disabled}><small>${bridge.desktop ? "Keys entered here are encrypted locally and never returned to the editor interface." : "Provider connections are available in the Windows desktop app."}</small></div>
+          ${settings.hasKey ? '<label class="update-automatic"><input id="setting-clear-key" type="checkbox"> Remove saved API key</label>' : ""}
+          <div class="settings-note">${icon("plug")}<span>Already use Claude, Codex, or Cursor? <button type="button" class="quiet-button" id="settings-mcp">Connect through the local MCP server ↗</button></span></div>
+        </section>
+        <section id="settings-updates" class="hidden" role="tabpanel" aria-labelledby="settings-updates-tab"></section>
+        <div id="settings-error" class="inline-error" role="alert"></div>
+      </div>
+    </form>`,
+    `<span id="settings-footer-note">Changes apply to this project.</span><button class="quiet-button" id="settings-close" data-close>Cancel</button><button class="primary-button" id="settings-save" type="submit" form="settings-form">Save changes</button>`,
   );
+  dialog.classList.add("settings-dialog");
+  function showSection(name, focusTab = false) {
+    if (!["project", "ai", "updates"].includes(name)) name = "project";
+    for (const tab of $$("[data-settings-panel]")) {
+      const active = tab.dataset.settingsPanel === name;
+      tab.classList.toggle("active", active);
+      tab.setAttribute("aria-selected", String(active));
+      tab.tabIndex = active ? 0 : -1;
+      $(`#settings-${tab.dataset.settingsPanel}`).classList.toggle(
+        "hidden",
+        !active,
+      );
+      if (active && focusTab) tab.focus();
+    }
+    $("#settings-save").classList.toggle("hidden", name === "updates");
+    $("#settings-close").textContent = name === "updates" ? "Done" : "Cancel";
+    $("#settings-footer-note").textContent =
+      name === "updates"
+        ? "Update preferences are saved automatically."
+        : "Save project and assistant preferences.";
+  }
+  for (const tab of $$("[data-settings-panel]"))
+    tab.onclick = () => showSection(tab.dataset.settingsPanel);
+  $(".settings-nav").onkeydown = (event) => {
+    if (!["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const tabs = $$("[data-settings-panel]");
+    const index = tabs.indexOf(document.activeElement);
+    const next =
+      event.key === "Home"
+        ? 0
+        : event.key === "End"
+          ? tabs.length - 1
+          : (index + (event.key === "ArrowDown" ? 1 : -1) + tabs.length) %
+            tabs.length;
+    showSection(tabs[next].dataset.settingsPanel, true);
+  };
+  showSection(section);
+  $("#settings-form").addEventListener("invalid", (event) => {
+    const panel = event.target.closest('[role="tabpanel"]');
+    if (panel) showSection(panel.id.replace("settings-", ""));
+    event.target.focus();
+  }, true);
+  if (section === "ai") $("#setting-endpoint").focus();
+  else if (section === "updates") $("#settings-updates-tab").focus();
+  else $("#setting-width").focus();
   $("#setting-preset").onchange = (e) => {
     if (e.target.value === "custom") return;
     const [w, h] = e.target.value.split(",");
@@ -817,6 +929,7 @@ async function showSettings() {
     $("#setting-height").value = h;
   };
   $("#settings-mcp").onclick = showMcp;
+  void mountUpdates(bridge);
   $("#settings-form").onsubmit = async (e) => {
     e.preventDefault();
     const width = Number($("#setting-width").value),
@@ -842,7 +955,8 @@ async function showSettings() {
       }
       $("#agent-provider").querySelector("span:not([data-icon])").textContent =
         settings.model || "Connect agent";
-      $("#modal").close();
+      $("#agent-provider").title = settings.model || "Connect an AI provider";
+      dialog.close();
       toast("Settings saved.");
     } catch (error) {
       $("#settings-error").textContent = error.message;
@@ -943,9 +1057,10 @@ function showShortcuts() {
   );
 }
 document.addEventListener("keydown", (e) => {
+  if (e.defaultPrevented) return;
   if (e.key === "Escape") {
-    $("#context-menu").classList.add("hidden");
-    $("#project-menu").classList.add("hidden");
+    closeMenu($("#context-menu"), true);
+    closeMenu($("#project-menu"), true);
     return;
   }
   if (
@@ -974,6 +1089,13 @@ document.addEventListener("keydown", (e) => {
     if (key === "d" && selected) edit("duplicate_clip", { id: selected });
     return;
   }
+  // Let focused controls handle activation and navigation before editor shortcuts.
+  if (e.target.closest('[role="menu"]')) return;
+  if (
+    e.target.closest('button,a,[role="button"],[role="tab"],[role="menu"]') &&
+    [" ", "Enter", "ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)
+  )
+    return;
   if (e.code === "Space") {
     handled();
     play();
@@ -1016,7 +1138,24 @@ window.addEventListener("unhandledrejection", (event) => {
   toast(event.reason?.message ?? "An unexpected operation failed.", true);
 });
 renderState(state);
+setLibrary("media");
 showRight("inspector");
+let updatePhase;
+function showUpdateState(update) {
+  $("#settings-button").classList.toggle(
+    "update-ready",
+    update.phase === "ready",
+  );
+  $("#settings-button").title =
+    update.phase === "ready"
+      ? "Settings · Update ready to install"
+      : "Settings";
+  if (update.phase === "ready" && updatePhase !== "ready")
+    toast("Update ready. Open Settings to restart and install.");
+  updatePhase = update.phase;
+}
+bridge.onUpdate?.(showUpdateState);
+void bridge.updates().then(showUpdateState);
 if (settings.model)
   $("#agent-provider").querySelector("span:not([data-icon])").textContent =
     settings.model;

@@ -37,6 +37,7 @@ jobs:
             release/*.exe
             release/*.blockmap
             release/latest.yml
+            release/beta.yml
             release/SHA256SUMS.txt
             release/README.txt
             release/PalmierWin-preview.png
@@ -56,7 +57,7 @@ jobs:
         with:
           name: PalmierWin-Windows-x64
           path: release
-      - name: Publish preview with Windows files
+      - name: Publish stable or beta release with Windows files
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
@@ -67,13 +68,22 @@ jobs:
             echo "Release tag must match package version: $EXPECTED_TAG"
             exit 1
           fi
+          if [[ "$RELEASE_TAG" == *-* ]]; then
+            CHANNEL_ARGS=(--prerelease)
+            LATEST_ARGS=(--prerelease --latest=false)
+            RELEASE_LABEL="Beta"
+          else
+            CHANNEL_ARGS=()
+            LATEST_ARGS=(--prerelease=false --latest)
+            RELEASE_LABEL="Stable"
+          fi
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft' > release-state.txt; then
             if [ "$(cat release-state.txt)" != "true" ]; then
               echo "Release $RELEASE_TAG is already published. Leaving its files intact."
               exit 0
             fi
           else
-            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --draft --prerelease --title "PalmierWin $RELEASE_TAG — Windows preview" --notes-file "docs/releases/$RELEASE_TAG.md"
+            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --draft "${CHANNEL_ARGS[@]}" --title "PalmierWin $RELEASE_TAG — $RELEASE_LABEL" --notes-file "docs/releases/$RELEASE_TAG.md"
           fi
           gh release upload "$RELEASE_TAG" release/* --repo "$GITHUB_REPOSITORY" --clobber
-          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease --latest=false
+          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false "${LATEST_ARGS[@]}"

@@ -35,6 +35,7 @@ const paths = {
   type: "M4 6V3h16v3M12 3v18M8 21h8",
   arrowUpRight: "M7 17 17 7M7 7h10v10",
   arrowUp: "M12 19V5m-5 5 5-5 5 5",
+  download: "M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5",
   smartphone: "M7 2h10v20H7zM11 18h2",
   layers: "m12 3 10 5-10 5L2 8Zm-9 9 9 5 9-5M3 17l9 5 9-5",
   cursor: "m5 3 14 10-7 1-3 7z",

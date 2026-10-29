@@ -43,11 +43,14 @@ export class Timeline {
     $("#ruler").addEventListener("pointerdown", (e) => this.seekDrag(e));
     $("#tracks").addEventListener("pointerdown", (e) => this.startDrag(e));
     $("#tracks").addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
+      if (["Enter", " "].includes(e.key)) {
         const clip = e.target.closest("[data-clip]");
         if (clip) {
           e.preventDefault();
           this.select(clip.dataset.clip);
+          $(`[data-clip="${CSS.escape(clip.dataset.clip)}"]`)?.focus({
+            preventScroll: true,
+          });
         }
       }
     });
@@ -85,9 +88,10 @@ export class Timeline {
   }
   setTool(tool) {
     this.tool = tool;
-    $$("[data-tool]").forEach((b) =>
-      b.classList.toggle("active", b.dataset.tool === tool),
-    );
+    $$("[data-tool]").forEach((b) => {
+      b.classList.toggle("active", b.dataset.tool === tool);
+      b.setAttribute("aria-pressed", String(b.dataset.tool === tool));
+    });
     $("#tracks").style.cursor = tool === "razor" ? "crosshair" : "";
   }
   toggleSnap() {
@@ -178,7 +182,7 @@ export class Timeline {
     $("#tracks").innerHTML = p.tracks
       .map(
         (t) =>
-          `<div class="track ${t.type === "audio" ? "audio-track" : ""} ${t.hidden ? "track-hidden" : ""}" data-track="${esc(t.id)}"><div class="track-header">${icon(t.type === "audio" ? "music" : "film")}<span class="track-name" title="${esc(t.name)}">${esc(t.name)}</span><div class="track-controls"><button data-track-action="${t.type === "audio" ? "muted" : "hidden"}" class="${t.type === "audio" ? (t.muted ? "active" : "") : t.hidden ? "active" : ""}" title="${t.type === "audio" ? (t.muted ? "Unmute track" : "Mute track") : t.hidden ? "Show track" : "Hide track"}" aria-label="${t.type === "audio" ? "Toggle mute" : "Toggle visibility"}">${icon(t.type === "audio" ? (t.muted ? "volumeOff" : "volume") : t.hidden ? "eyeOff" : "eye")}</button><button data-track-action="locked" class="${t.locked ? "active" : ""}" title="${t.locked ? "Unlock" : "Lock"} track" aria-label="Toggle track lock">${icon(t.locked ? "lock" : "unlock")}</button></div></div>${p.clips
+          `<div class="track ${t.type === "audio" ? "audio-track" : ""} ${t.hidden ? "track-hidden" : ""}" data-track="${esc(t.id)}"><div class="track-header">${icon(t.type === "audio" ? "music" : "film")}<span class="track-name" title="${esc(t.name)}">${esc(t.name)}</span><div class="track-controls"><button data-track-action="${t.type === "audio" ? "muted" : "hidden"}" class="${t.type === "audio" ? (t.muted ? "active" : "") : t.hidden ? "active" : ""}" title="${t.type === "audio" ? (t.muted ? "Unmute track" : "Mute track") : t.hidden ? "Show track" : "Hide track"}" aria-label="${t.type === "audio" ? "Toggle mute" : "Toggle visibility"}" aria-pressed="${t.type === "audio" ? t.muted : t.hidden}">${icon(t.type === "audio" ? (t.muted ? "volumeOff" : "volume") : t.hidden ? "eyeOff" : "eye")}</button><button data-track-action="locked" class="${t.locked ? "active" : ""}" title="${t.locked ? "Unlock" : "Lock"} track" aria-label="Toggle track lock" aria-pressed="${t.locked}">${icon(t.locked ? "lock" : "unlock")}</button></div></div>${p.clips
             .filter((c) => c.trackId === t.id)
             .map((c) => this.clipHtml(c))
             .join("")}</div>`,
@@ -222,7 +226,7 @@ export class Timeline {
       c.type === "audio"
         ? `<div class="clip-waveform">${Array.from({ length: Math.min(1000, Math.ceil(width / 4)) }, (_, i) => `<i style="height:${3 + (Math.sin(i * 1.9) + Math.sin(i * 0.48) + 2) * 3}px"></i>`).join("")}</div>`
         : "";
-    return `<div class="timeline-clip type-${c.type}${selected ? " selected" : ""}" data-clip="${esc(c.id)}" style="left:${HEADER + c.start * this.zoom}px;width:${width}px" tabindex="0" role="button" aria-label="${esc(c.name)}, starts ${timecode(c.start, p.fps)}, duration ${timecode(c.duration, p.fps)}" title="${esc(c.name)}"><div class="clip-fill"></div>${waves}<span class="clip-label">${icon(c.type === "text" ? "type" : c.type === "audio" ? "music" : c.type === "image" ? "image" : "film")}${esc(c.name)}</span><span class="clip-duration">${shortTime(c.duration, p.fps)}</span>${c.keyframes.map((k) => `<span class="clip-keyframe" style="left:${k.frame * this.zoom}px"></span>`).join("")}<div class="trim-handle start" data-edge="start"></div><div class="trim-handle end" data-edge="end"></div></div>`;
+    return `<div class="timeline-clip type-${c.type}${selected ? " selected" : ""}" data-clip="${esc(c.id)}" style="left:${HEADER + c.start * this.zoom}px;width:${width}px" tabindex="0" role="button" aria-pressed="${selected}" aria-label="${esc(c.name)}, starts ${timecode(c.start, p.fps)}, duration ${timecode(c.duration, p.fps)}" title="${esc(c.name)}"><div class="clip-fill"></div>${waves}<span class="clip-label">${icon(c.type === "text" ? "type" : c.type === "audio" ? "music" : c.type === "image" ? "image" : "film")}${esc(c.name)}</span><span class="clip-duration">${shortTime(c.duration, p.fps)}</span>${c.keyframes.map((k) => `<span class="clip-keyframe" style="left:${k.frame * this.zoom}px"></span>`).join("")}<div class="trim-handle start" data-edge="start"></div><div class="trim-handle end" data-edge="end"></div></div>`;
   }
   updatePlayhead() {
     const p = this.getProject(),

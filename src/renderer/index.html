@@ -24,7 +24,13 @@
             /></svg
           ><span>Palmier<span class="brand-win">Win</span></span>
         </div>
-        <button id="chat-toggle" class="quiet-button" title="Toggle agent chat">
+        <button
+          id="chat-toggle"
+          class="quiet-button"
+          title="Toggle agent chat"
+          aria-controls="agent-panel"
+          aria-expanded="false"
+        >
           <span data-icon="sparkles"></span>Chat
         </button>
         <span class="titlebar-caption">Somewhere, slowly</span>
@@ -72,6 +78,9 @@
             </button>
             <button data-command="settings">
               <span data-icon="settings"></span>Project & agent settings
+            </button>
+            <button data-command="updates">
+              <span data-icon="download"></span>App updates
             </button>
             <button data-command="demo">
               <span data-icon="sparkles"></span>Open sample project
@@ -133,7 +142,12 @@
               <span data-icon="sparkles"></span>Generate
             </button>
           </div>
-          <section id="media-panel" class="library-content">
+          <section
+            id="media-panel"
+            class="library-content"
+            role="tabpanel"
+            aria-labelledby="media-tab"
+          >
             <div class="library-heading">
               <span
                 >Project media
@@ -144,7 +158,7 @@
                 aria-label="Import media"
                 title="Import media (Ctrl I)"
               >
-                <span data-icon="plus"></span>
+                <span data-icon="plus"></span><span>Import</span>
               </button>
             </div>
             <label class="search"
@@ -156,10 +170,11 @@
               /><kbd>⌕</kbd></label
             >
             <div class="filter-row" aria-label="Filter media">
-              <button class="active" data-filter="all">All</button
-              ><button data-filter="video">Video</button
-              ><button data-filter="image">Images</button
-              ><button data-filter="audio">Audio</button>
+              <button class="active" data-filter="all" aria-pressed="true">
+                All</button
+              ><button data-filter="video" aria-pressed="false">Video</button
+              ><button data-filter="image" aria-pressed="false">Images</button
+              ><button data-filter="audio" aria-pressed="false">Audio</button>
             </div>
             <div id="media-grid" class="media-grid"></div>
             <button class="import-zone" id="import-button">
@@ -168,7 +183,12 @@
               ><small>VIDEO · AUDIO · IMAGES · SRT</small>
             </button>
           </section>
-          <section id="generate-panel" class="generate-content hidden">
+          <section
+            id="generate-panel"
+            class="generate-content hidden"
+            role="tabpanel"
+            aria-labelledby="generate-tab"
+          >
             <div class="feature-icon" data-icon="sparkles"></div>
             <span class="eyebrow">YOUR TOOLS, ONE TIMELINE</span>
             <h2>From an idea<br />to the edit.</h2>
@@ -302,18 +322,20 @@
               <span data-icon="sliders"></span>Inspector
             </button>
           </div>
-          <section id="agent-panel" class="agent-content">
+          <section
+            id="agent-panel"
+            class="agent-content"
+            role="tabpanel"
+            aria-labelledby="agent-tab"
+          >
             <div id="chat-messages" class="chat-messages">
               <div class="agent-welcome">
                 <div class="agent-orbit">
                   <span data-icon="sparkles"></span>
                 </div>
-                <span class="eyebrow">A LITTLE HELP WITH THE BIG PICTURE</span>
-                <h2>What are we<br />making today?</h2>
-                <p>
-                  Bring your idea. Shape the story.<br />Keep the creative part
-                  yours.
-                </p>
+                <span class="eyebrow">EDITING ASSISTANT</span>
+                <h2>What would you<br />like to change?</h2>
+                <p>Describe an edit, or start with a quick action below.</p>
                 <div class="suggestions">
                   <button data-quick="title">
                     <span data-icon="type"></span>Add a title at the
@@ -360,12 +382,14 @@
               </div>
             </form>
             <span class="composer-note"
-              >Your project stays on your computer.</span
+              >Edits stay local. AI chat uses your provider.</span
             >
           </section>
           <section
             id="inspector-panel"
             class="inspector-content hidden"
+            role="tabpanel"
+            aria-labelledby="inspector-tab"
           ></section>
         </aside>
       </main>
@@ -385,6 +409,7 @@
             <button
               class="tool active"
               data-tool="select"
+              aria-pressed="true"
               title="Selection tool (V)"
               aria-label="Selection tool"
             >
@@ -392,6 +417,7 @@
             ><button
               class="tool"
               data-tool="razor"
+              aria-pressed="false"
               title="Razor tool (C)"
               aria-label="Razor tool"
             >
